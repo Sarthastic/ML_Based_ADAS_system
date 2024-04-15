@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Car Damage Assessment and Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container mt-16">
+        <div class="flex flex-col gap-6 items-center">
+            <div class="lg:max-w-5xl w-full h-96 max-h-96 mx-auto p-6 bg-white rounded-md shadow-md relative">
+                <!-- Drop Zone -->
+                <label id="drop-zone"
+                    class="flex flex-col items-center w-full h-40 p-6 border-2 border-gray-300 border-dashed rounded-md cursor-pointer hover:border-gray-400 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-gray-400 mb-2" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span class="text-sm text-gray-600">
+                        Drop files here or
+                        <span class="text-blue-600 underline">browse</span>
+                    </span>
+                    <input type="file" name="file_upload" class="hidden" id="file-input">
+                </label>
+                <!-- Preview Container -->
+                <div id="preview-container" class="h-44 mt-4 grid grid-cols-4 gap-4"></div>
+            </div>
+
+            <button id="btn-predict" disabled>
+                Predict
+            </button>
+
+            <div class="lg:max-w-5xl w-full mb-12 h-[26rem] max-h-[28rem] mx-auto p-6 bg-white rounded-md shadow-md"
+                id="result-section">
+                <span class="font-medium">Result: </span>
+                <!-- Result Text -->
+                <h4 id="result" class="text-gray-800"></h4>
+                <!-- Predicted Image -->
+                <div class="flex justify-between mt-2">
+                    <div class="w-1/2 flex flex-col gap-1 items-center">
+                        <img id="predictionImage" class="rounded-md mt-3 h-72 max-h-72" alt="prediction">
+                        <span>Predicted Image</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // DOM elements
+            const loader = document.querySelector('#loader');
+            const loaderBar = document.querySelector('#loader-bar');
+            const result = document.querySelector('#result');
+            const btnPredict = document.querySelector('#btn-predict');
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const previewContainer = document.getElementById('preview-container');
+
+            const form_data = new FormData();
+
+            // Drag and drop event listeners for drop zone
+            dropZone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                dropZone.classList.add('border-gray-400');
+            });
+
+            dropZone.addEventListener('dragleave', function () {
+                dropZone.classList.remove('border-gray-400');
+            });
+
+            dropZone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                dropZone.classList.remove('border-gray-400');
+
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+
+            // Change event listener for file input
+            fileInput.addEventListener('change', function () {
+                const files = fileInput.files;
+                if (!files.length) return;
+                handleFiles(files);
+                event.target.value = ''
+            });
+
+            // Function to handle dropped or selected files
+            function handleFiles(files) {
+                // Remove existing preview items
+                previewContainer.innerHTML = '';
+
+                for (const file of files) {
+                    const reader = new FileReader();
+
+                    reader.onload = function (e) {
+                        const previewItem = createPreviewItem(e.target.result);
+                        previewContainer.appendChild(previewItem);
+                    };
+
+                    reader.readAsDataURL(file);
+                    // Append file to form_data
+                    form_data.delete('file');
+                    form_data.append('file', file);
+                }
+            }
+
+            // Function to create preview item for each file
+            function createPreviewItem(imageSrc) {
+                const previewItem = document.createElement('div');
+                previewItem.classList.add('relative', 'group');
+
+                const previewImage = document.createElement('img');
+                previewImage.src = imageSrc;
+                previewImage.classList.add('w-full', 'h-32', 'object-cover', 'rounded-md', 'mb-2');
+
+                previewItem.appendChild(previewImage);
+
+                return previewItem;
+            }
+
+            // Predict button click event listener
+            btnPredict.addEventListener('click', function () {
+                // Make prediction by calling api /predict
+                fetch('/predict', {
+                    method: 'POST',
+                    body: form_data,
+                    contentType: false,
+                    processData: false,
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Get original image from form data set it
+                        const originalImage = document.querySelector('#originalImage');
+                        originalImage.setAttribute('src', URL.createObjectURL(form_data.get('file')));
+
+                        // Display the predicted image
+                        const predictionImage = document.querySelector('#predictionImage');
+                        // Replace backslashes with forward slashes and encode spaces
+                        const imageUrl = data.prediction_image_url.replace(/\\/g, '/').replace(/ /g, '%20');
+                        predictionImage.setAttribute('src', imageUrl);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            });
+        });
+    </script>
+
+</body>
+
+</html>
